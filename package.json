@@ -14,7 +14,7 @@
     "@fastify/view": "^8.0.0"
   },
   "engines": {
-    "node": "14.x"
+    "node": ""
   },
   "repository": {
     "url": "https://glitch.com/edit/#!/glitch-hello-node"

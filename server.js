@@ -1,119 +1,144 @@
-/**
- * This is the main Node.js server script for your project
- * Check out the two endpoints this back-end API provides in fastify.get and fastify.post below
- */
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const express = require('express');
+const bodyParser = require('body-parser');
+const qrcode = require('qrcode-terminal');
 
-const path = require("path");
+const app = express();
+app.use(bodyParser.json());
+const port = process.env.PORT || 3123;
 
-// Require the fastify framework and instantiate it
-const fastify = require("fastify")({
-  // Set this to true for detailed logging:
-  logger: false,
+let isWhatsAppReady = false;
+let pendingMessages = [];
+
+const client = new Client({
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
 });
 
-// ADD FAVORITES ARRAY VARIABLE FROM TODO HERE
-
-// Setup our static files
-fastify.register(require("@fastify/static"), {
-  root: path.join(__dirname, "public"),
-  prefix: "/", // optional: default '/'
-});
-
-// Formbody lets us parse incoming forms
-fastify.register(require("@fastify/formbody"));
-
-// View is a templating manager for fastify
-fastify.register(require("@fastify/view"), {
-  engine: {
-    handlebars: require("handlebars"),
-  },
-});
-
-// Load and parse SEO data
-const seo = require("./src/seo.json");
-if (seo.url === "glitch-default") {
-  seo.url = `https://${process.env.PROJECT_DOMAIN}.glitch.me`;
+async function sendPendingMessages() {
+    if (!isWhatsAppReady) return;
+    
+    console.log(`Mencoba mengirim ${pendingMessages.length} pesan tertunda`);
+    
+    while (pendingMessages.length > 0) {
+        const { number, message, responseCallback } = pendingMessages.shift();
+        
+        try {
+            const formattedNumber = number.includes('@c.us') ? number : `${number}@c.us`;
+            await client.sendMessage(formattedNumber, message);
+            responseCallback({ 
+                success: true, 
+                message: 'OTP berhasil dikirim ke WhatsApp', 
+                phoneNumber: number.split('@')[0] 
+            });
+        } catch (error) {
+            console.error('Error mengirim pesan tertunda:', error);
+            responseCallback({ 
+                success: false, 
+                message: 'Gagal mengirim OTP', 
+                error: error.message 
+            });
+        }
+    }
 }
 
-/**
- * Our home page route
- *
- * Returns src/pages/index.hbs with data built into it
- */
-fastify.get("/", function (request, reply) {
-  // params is an object we'll pass to our handlebars template
-  let params = { seo: seo };
-
-  // If someone clicked the option for a random color it'll be passed in the querystring
-  if (request.query.randomize) {
-    // We need to load our color data file, pick one at random, and add it to the params
-    const colors = require("./src/colors.json");
-    const allColors = Object.keys(colors);
-    let currentColor = allColors[(allColors.length * Math.random()) << 0];
-
-    // Add the color properties to the params object
-    params = {
-      color: colors[currentColor],
-      colorError: null,
-      seo: seo,
-    };
-  }
-
-  // The Handlebars code will be able to access the parameter values and build them into the page
-  return reply.view("/src/pages/index.hbs", params);
+client.on('qr', (qr) => {
+    console.log('QR CODE:');
+    qrcode.generate(qr, { small: true });
+    console.log('Silakan scan QR code di atas untuk login ke WhatsApp.');
 });
 
-/**
- * Our POST route to handle and react to form submissions
- *
- * Accepts body data indicating the user choice
- */
-fastify.post("/", function (request, reply) {
-  // Build the params object to pass to the template
-  let params = { seo: seo };
-
-  // If the user submitted a color through the form it'll be passed here in the request body
-  let color = request.body.color;
-
-  // If it's not empty, let's try to find the color
-  if (color) {
-    // ADD CODE FROM TODO HERE TO SAVE SUBMITTED FAVORITES
-
-    // Load our color data file
-    const colors = require("./src/colors.json");
-
-    // Take our form submission, remove whitespace, and convert to lowercase
-    color = color.toLowerCase().replace(/\s/g, "");
-
-    // Now we see if that color is a key in our colors object
-    if (colors[color]) {
-      // Found one!
-      params = {
-        color: colors[color],
-        colorError: null,
-        seo: seo,
-      };
-    } else {
-      // No luck! Return the user value as the error property
-      params = {
-        colorError: request.body.color,
-        seo: seo,
-      };
-    }
-  }
-
-  // The Handlebars template will use the parameter values to update the page with the chosen color
-  return reply.view("/src/pages/index.hbs", params);
+client.on('ready', () => {
+    console.log('Bot WhatsApp siap digunakan!');
+    console.log('port: ', port);;
+    isWhatsAppReady = true;
+    sendPendingMessages();
 });
 
-// Run the server and report out to the logs
-fastify.listen(
-  { port: process.env.PORT, host: "0.0.0.0" },
-  function (err, address) {
-    if (err) {
-      console.error(err);
-      process.exit(1);
+client.on('disconnected', (reason) => {
+    console.log('Bot WhatsApp terputus:', reason);
+    isWhatsAppReady = false;
+});
+
+app.get('/status', (req, res) => {
+    res.json({
+        whatsappConnected: isWhatsAppReady,
+        pendingMessages: pendingMessages.length
+    });
+});
+
+app.post('/send-otp', async (req, res) => {
+    try {
+        const { phoneNumber, otpCode } = req.body;
+        
+        if (!phoneNumber || !otpCode) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Nomor telepon dan kode OTP diperlukan' 
+            });
+        }
+        
+        let formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
+        if (!formattedNumber.includes('@c.us')) {
+            formattedNumber = `${formattedNumber}@c.us`;
+        }
+        
+        const messageText = `Kode OTP Anda adalah: ${otpCode}\n\nJangan bagikan kode ini kepada siapapun.`;
+        
+        if (isWhatsAppReady) {
+            try {
+                await client.sendMessage(formattedNumber, messageText);
+                
+                res.status(200).json({
+                    success: true,
+                    message: 'OTP berhasil dikirim ke WhatsApp',
+                    phoneNumber: phoneNumber
+                });
+            } catch (error) {
+                console.error('Error mengirim pesan:', error);
+                res.status(500).json({ 
+                    success: false, 
+                    message: 'Terjadi kesalahan saat mengirim OTP',
+                    error: error.message
+                });
+            }
+        } else {
+            pendingMessages.push({
+                number: formattedNumber,
+                message: messageText,
+                responseCallback: (response) => {
+                    if (res.headersSent) return;
+                    
+                    if (response.success) {
+                        res.json(response);
+                    } else {
+                        res.status(500).json(response);
+                    }
+                }
+            });
+            
+            res.json({
+                success: true,
+                message: 'Pesan OTP ditambahkan ke antrian dan akan dikirim segera setelah WhatsApp terhubung',
+                status: 'pending',
+                phoneNumber: phoneNumber
+            });
+        }
+    } catch (error) {
+        console.error('Error pada endpoint send-otp:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Terjadi kesalahan saat memproses permintaan OTP',
+            error: error.message
+        });
     }
-    console.log(`Your app is listening on ${address}`);
-  }
-);
+});
+
+client.initialize();
+
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server berjalan di port ${port}`);
+});
