@@ -1,13 +1,13 @@
-2025/05/26-16:03:51.403 3a8 Reusing MANIFEST /app/.wwebjs_auth/session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/05/26-16:03:51.403 3a8 Recovering log #265
-2025/05/26-16:03:51.406 3a8 Reusing old log /app/.wwebjs_auth/session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000265.log 
-2025/05/26-16:04:06.529 39a Level-0 table #271: started
-2025/05/26-16:04:06.620 39a Level-0 table #271: 39592 bytes OK
-2025/05/26-16:04:06.703 39a Delete type=0 #265
-2025/05/26-16:04:06.703 39a Manual compaction at level-0 from '\x00c\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00d\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/05/26-16:04:38.109 3a9 Compacting 1@1 + 1@2 files
-2025/05/26-16:04:38.923 3a9 Generated table #272@1: 23283 keys, 974120 bytes
-2025/05/26-16:04:38.923 3a9 Compacted 1@1 + 1@2 files => 974120 bytes
-2025/05/26-16:04:39.001 3a9 compacted to: files[ 0 0 1 0 0 0 0 ]
-2025/05/26-16:04:39.001 3a9 Delete type=2 #271
-2025/05/26-16:04:39.001 3a9 Delete type=2 #268
+2025/05/26-16:16:24.911 511 Reusing MANIFEST /app/.wwebjs_auth/session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/05/26-16:16:24.911 511 Recovering log #270
+2025/05/26-16:16:25.240 511 Reusing old log /app/.wwebjs_auth/session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000270.log 
+2025/05/26-16:16:53.719 513 Level-0 table #275: started
+2025/05/26-16:16:53.906 513 Level-0 table #275: 173552 bytes OK
+2025/05/26-16:16:53.911 513 Delete type=0 #270
+2025/05/26-16:16:53.911 54d Manual compaction at level-0 from '\x00d\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00e\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/05/26-16:17:41.017 54c Compacting 1@1 + 1@2 files
+2025/05/26-16:17:41.432 54c Generated table #276@1: 24680 keys, 1024668 bytes
+2025/05/26-16:17:41.432 54c Compacted 1@1 + 1@2 files => 1024668 bytes
+2025/05/26-16:17:41.502 54c compacted to: files[ 0 0 1 0 0 0 0 ]
+2025/05/26-16:17:41.502 54c Delete type=2 #275
+2025/05/26-16:17:41.502 54c Delete type=2 #272

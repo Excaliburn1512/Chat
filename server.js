@@ -4,7 +4,15 @@ const bodyParser = require('body-parser');
 const qrcode = require('qrcode-terminal');
 
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParser.json({
+  verify: (req, res, buf) => {
+    try {
+      JSON.parse(buf.toString());
+    } catch (e) {
+      throw new Error('Invalid JSON: ' + e.message);
+    }
+  }
+}));
 const port = process.env.PORT || 3123;
 
 let isWhatsAppReady = false;
@@ -27,8 +35,16 @@ async function sendPendingMessages() {
         const { number, message, responseCallback } = pendingMessages.shift();
         
         try {
-            const formattedNumber = number.includes('@c.us') ? number : `${number}@c.us`;
-            await client.sendMessage(formattedNumber, message);
+            // Validasi ulang nomor sebelum kirim dari antrian
+            if (!await client.isRegisteredUser(number)) {
+                responseCallback({
+                    success: false,
+                    message: 'Nomor tidak terdaftar di WhatsApp dari antrian',
+                    phoneNumber: number.split('@')[0]
+                });
+                continue;
+            }
+            await client.sendMessage(number, message);
             responseCallback({ 
                 success: true, 
                 message: 'OTP berhasil dikirim ke WhatsApp', 
@@ -38,7 +54,7 @@ async function sendPendingMessages() {
             console.error('Error mengirim pesan tertunda:', error);
             responseCallback({ 
                 success: false, 
-                message: 'Gagal mengirim OTP', 
+                message: 'Gagal mengirim OTP dari antrian', 
                 error: error.message 
             });
         }
@@ -53,7 +69,7 @@ client.on('qr', (qr) => {
 
 client.on('ready', () => {
     console.log('Bot WhatsApp siap digunakan!');
-    console.log('port: ', port);;
+    console.log('port: ', port);
     isWhatsAppReady = true;
     sendPendingMessages();
 });
@@ -81,11 +97,36 @@ app.post('/send-otp', async (req, res) => {
             });
         }
         
+        // Format nomor ke standar internasional (+62)
         let formattedNumber = phoneNumber.replace(/[^0-9]/g, '');
-        if (!formattedNumber.includes('@c.us')) {
-            formattedNumber = `${formattedNumber}@c.us`;
+        if (formattedNumber.startsWith('0')) {
+            formattedNumber = '62' + formattedNumber.slice(1);
+        } else if (!formattedNumber.startsWith('62')) {
+            return res.status(400).json({
+                success: false,
+                message: 'Nomor harus dalam format internasional (misalnya, 6285606650827)'
+            });
         }
-        
+        formattedNumber = `${formattedNumber}@c.us`;
+
+        // Validasi nomor
+        try {
+            const isRegistered = await client.isRegisteredUser(formattedNumber);
+            if (!isRegistered) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Nomor tidak terdaftar di WhatsApp'
+                });
+            }
+        } catch (error) {
+            console.error('Error checking registered user:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Gagal memvalidasi nomor WhatsApp',
+                error: error.message
+            });
+        }
+
         const messageText = `Kode OTP Anda adalah: ${otpCode}\n\nJangan bagikan kode ini kepada siapapun.`;
         
         if (isWhatsAppReady) {
